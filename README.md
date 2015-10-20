@@ -2,7 +2,7 @@
 
 [PencilBlue](http://pencilblue.org)
 =====
-
+branch: development
 ### A full featured Node.js CMS and blogging platform (plugins, server cluster management, data-driven pages)
 
 First and foremost:  If at any point you have questions, comments or concerns you can find us hanging out on twitter [@getpencilblue](https://twitter.com/GetPencilBlue) and on our [subreddit](http://www.reddit.com/domain/pencilblue.org/).  We're always happy to help and pull requests (plugin or core) are always welcome.  
@@ -23,6 +23,8 @@ The first open source content management system to meet all the needs of a moder
 
 Installation
 -----
+
+[![LAUNCH ON OpenShift](http://launch-shifter.rhcloud.com/launch/LAUNCH ON.svg)](https://hub.openshift.com/quickstarts/deploy/159-pencilblue)
 
 The instructions below assume that Node.js and MongoDB are installed on your machine. If they are not then please visit http://nodejs.org and http://www.mongodb.org to install them.
 
