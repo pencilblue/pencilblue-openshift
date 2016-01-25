@@ -35,7 +35,7 @@ module.exports = function PluginJobRunnerModule(pb) {
          * @type {PluginService}
          */
         this.pluginService = new pb.PluginService();
-    };
+    }
     util.inherits(PluginJobRunner, pb.ClusterJobRunner);
 
     /**
@@ -63,6 +63,16 @@ module.exports = function PluginJobRunnerModule(pb) {
      */
     PluginJobRunner.prototype.getPluginUid = function() {
         return this.pluginUid;
+    };
+
+    PluginJobRunner.prototype.setSite = function(site) {
+        this.site = site;
+        this.pluginService = new pb.PluginService({site: site});
+        return this;
+    };
+
+    PluginJobRunner.prototype.getSite = function() {
+        return this.site;
     };
 
     /**

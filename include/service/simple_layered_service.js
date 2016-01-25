@@ -55,7 +55,7 @@ module.exports = function SimpleLayeredServiceModule(pb) {
             },
             function(callback) {//do
                 if (pb.log.isSilly()) {
-                    pb.log.silly(instance.name+": Checking Service ["+instance.services[i].type+"] for Key ["+key+"]");
+                    pb.log.silly('%s: Checking Service [%s] for key [%s]', instance.name, instance.services[i].type, key);
                 }
 
                 instance.services[i].get(key, function(err, result){
@@ -65,7 +65,7 @@ module.exports = function SimpleLayeredServiceModule(pb) {
                         return;
                     }
 
-                    if (result) {
+                    if (result || (typeof result === 'boolean' && result === false)) {
                         resultNotFound = false;
                         entity         = result;
                     }
