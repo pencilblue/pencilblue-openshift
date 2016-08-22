@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2015  PencilBlue, LLC
+    Copyright (C) 2016  PencilBlue, LLC
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@ module.exports = function ResendVerificationModule(pb) {
    */
   function ResendVerification(){}
   util.inherits(ResendVerification, pb.BaseController);
+
   ResendVerification.prototype.render = function(cb) {
     var self = this;
     var contentService = new pb.ContentService({site: self.site, onlyThisSite: true});
@@ -44,7 +45,7 @@ module.exports = function ResendVerificationModule(pb) {
           cb({content: data});
         });
       });
-    
+
     });
   };
 

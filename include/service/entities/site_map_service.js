@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2015  PencilBlue, LLC
+ Copyright (C) 2016  PencilBlue, LLC
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -256,7 +256,7 @@ module.exports = function(pb) {
                 return cb(err);
             }
             cb(null, new pb.TemplateValue(results.join(''), false));
-        })
+        });
     };
 
     /**
@@ -376,7 +376,7 @@ module.exports = function(pb) {
         }
         SITE_MAP_REGISTRY[type] = callback;
         return true;
-    }
+    };
 
     /**
      * Unregisters an item provider from the site map service

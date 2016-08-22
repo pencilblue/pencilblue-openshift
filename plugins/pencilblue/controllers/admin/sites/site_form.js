@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2015  PencilBlue, LLC
+ Copyright (C) 2016  PencilBlue, LLC
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -42,7 +42,6 @@ module.exports = function SiteFormModule(pb) {
    */
   SiteForm.prototype.edit = function(cb) {
     var self = this;
-    var isNew = true;
     var id = this.pathVars.siteid;
     var dao = new pb.DAO();
     dao.loadByValue('uid', id, 'site', function(err, data) {

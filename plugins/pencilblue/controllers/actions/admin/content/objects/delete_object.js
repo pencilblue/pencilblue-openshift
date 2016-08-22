@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2015  PencilBlue, LLC
+    Copyright (C) 2016  PencilBlue, LLC
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,10 +16,10 @@
 */
 
 module.exports = function(pb) {
-    
+
     //pb dependencies
     var util = pb.util;
-    
+
     /**
      * Deletes an object
      */
@@ -42,7 +42,7 @@ module.exports = function(pb) {
             return;
         }
 
-        var cos = new pb.CustomObjectService(self.site, true);
+        var cos = new pb.CustomObjectService(self.site, false);
         cos.loadById(vars.id, function(err, customObject) {
             if (util.isError(err)) {
                 return self.reqHandler.serveError(err);
@@ -56,11 +56,11 @@ module.exports = function(pb) {
                 if(util.isError(err) || recordsDeleted <= 0) {
                     return cb({
                         code: 500,
-                        content: pb.BaseController.apiResponse(pb.BaseController.API_ERROR, self.ls.get('ERROR_DELETING'))
+                        content: pb.BaseController.apiResponse(pb.BaseController.API_ERROR, self.ls.g('generic.ERROR_DELETING'))
                     });
                 }
 
-                cb({content: pb.BaseController.apiResponse(pb.BaseController.API_SUCCESS, customObject.name + ' ' + self.ls.get('DELETED'))});
+                cb({content: pb.BaseController.apiResponse(pb.BaseController.API_SUCCESS, customObject.name + ' ' + self.ls.g('admin.DELETED'))});
             });
         });
     };

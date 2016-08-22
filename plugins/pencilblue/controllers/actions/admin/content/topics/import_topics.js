@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2015  PencilBlue, LLC
+    Copyright (C) 2016  PencilBlue, LLC
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@ module.exports = function(pb) {
 
             fs.readFile(files[0].path, function(err, data) {
                 if(util.isError(err)) {
-                    self.formError(self.ls.get('ERROR_SAVING'), '/admin/content/topics/import_topics', cb);
+                    self.formError(self.ls.g('generic.ERROR_SAVING'), '/admin/content/topics/import_topics', cb);
                     return;
                 }
 

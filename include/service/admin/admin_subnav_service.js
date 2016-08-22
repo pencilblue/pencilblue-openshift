@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2015  PencilBlue, LLC
+    Copyright (C) 2016  PencilBlue, LLC
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -136,7 +136,7 @@ module.exports = function AdminSubnavServiceModule(pb) {
      * @method addSiteToPills
      * @param {Array} standardPills list of pills
      * @param {String} siteName name of the site to add to the pill
-     * @returns {Array} a list of pills with site name added
+     * @return {Array} a list of pills with site name added
      */
     AdminSubnavService.addSiteToPills = function (standardPills, siteName) {
         var pills = [];

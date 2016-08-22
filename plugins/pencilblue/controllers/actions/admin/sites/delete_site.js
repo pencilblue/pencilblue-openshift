@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2015  PencilBlue, LLC
+ Copyright (C) 2016  PencilBlue, LLC
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -56,7 +56,7 @@ module.exports = function DeleteSiteActionModule(pb) {
             if (util.isError(err)|| !site) {
                 return self.reqHandler.serve404();
             }
-            cb({content: pb.BaseController.apiResponse(pb.BaseController.API_SUCCESS, self.ls.get('REMOVE_SUCCESSFUL'), site)});
+            cb({content: pb.BaseController.apiResponse(pb.BaseController.API_SUCCESS, self.ls.g('sites.REMOVE_SUCCESSFUL'), site)});
         });
     };
 
