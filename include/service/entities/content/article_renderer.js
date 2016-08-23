@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2015  PencilBlue, LLC
+ Copyright (C) 2016  PencilBlue, LLC
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -22,21 +22,53 @@ var async = require('async');
 module.exports = function(pb) {
 
     //pb dependencies
-    var DAO            = pb.DAO;
+    var DAO = pb.DAO;
 
     /**
      * Retrieves the necessary data as well as prepares the layout so a view
      * loader can complete the render of content
      * @class ArticleRenderer
      * @constructor
+     * @param {Object} context
+     * @param {String} context.hostname
+     * @param {String} context.site
+     * @param {Boolean} context.onlyThisSite
+     * @param {UserService} [context.userService]
      */
     function ArticleRenderer(context) {
         if (context) {
+
+            /**
+             * @property commentService
+             * @type {CommentService}
+             */
             this.commentService = new pb.CommentService(context);
+
+            /**
+             * @property hostname
+             * @type {string}
+             */
             this.hostname = context.hostname;
         }
+
+        /**
+         * @property site
+         * @type {string}
+         */
         this.site = pb.SiteService.getCurrentSite(context.site);
+
+        /**
+         * @property onlyThisSite
+         * @type {boolean}
+         */
         this.onlyThisSite = context.onlyThisSite;
+
+        /**
+         * Instance of user service.  No context is provided and therefore can only be used
+         * @property userService
+         * @type {UserService}
+         */
+        this.userService = context.userService || new pb.UserService(context);
     }
 
     /**
@@ -47,6 +79,15 @@ module.exports = function(pb) {
      * @type {String}
      */
     var READ_MORE_FLAG = '^read_more^';
+
+    /**
+     * @private
+     * @static
+     * @readonly
+     * @property ANONYMOUS_COMMENTER
+     * @type {String}
+     */
+    var ANONYMOUS_COMMENTER = 'Anonymous';
 
     /**
      * @method render
@@ -123,7 +164,7 @@ module.exports = function(pb) {
             content.media_body_style = '';
         }
 
-        content.author_name     = pb.users.getFormattedName(author);
+        content.author_name = this.userService.getFormattedName(author);
         content.author_position = '';
         if (author.position && contentSettings.display_author_position) {
             content.author_position = author.position;
@@ -194,12 +235,10 @@ module.exports = function(pb) {
             where: {
                 article: content[pb.DAO.getIdField()] + ''
             },
-            order: {
-                created: pb.DAO.ASC
-            }
+            order: [['created', pb.DAO.ASC]]
         };
         this.commentService.getAll(opts, function(err, comments) {
-            if(util.isError(err) || comments.length == 0) {
+            if(util.isError(err) || comments.length === 0) {
                 return cb(err);
             }
 
@@ -219,14 +258,15 @@ module.exports = function(pb) {
      * @param {Function} cb Callback function
      */
     ArticleRenderer.prototype.getCommenters = function(comments, contentSettings, cb) {
+        var self = this;
 
         //callback for iteration to handle setting the commenter attributes
         var processComment = function(comment, commenter) {
-            comment.commenter_name = 'Anonymous';
+            comment.commenter_name = ANONYMOUS_COMMENTER;
             comment.timestamp      = pb.ContentService.getTimestampTextFromSettings(comment.created, contentSettings);
 
             if (commenter) {
-                comment.commenter_name = pb.users.getFormattedName(commenter);
+                comment.commenter_name = self.userService.getFormattedName(commenter);
                 if(commenter.photo) {
                     comment.commenter_photo = commenter.photo;
                 }
@@ -254,7 +294,7 @@ module.exports = function(pb) {
                 //user has not already commented so load
                 var dao = new pb.DAO();
                 dao.loadById(comment.commenter, 'user', function(err, commenter) {
-                    if(util.isError(err) || commenter == null) {
+                    if(util.isError(err) || commenter === null) {
                         callback(null, false);
                         return;
                     }
@@ -318,7 +358,7 @@ module.exports = function(pb) {
 
             // Cutoff the content at the right number of paragraphs
             for(i = 0; i < tempLayoutArray.length && i < contentSettings.auto_break_articles; i++) {
-                if(i === contentSettings.auto_break_articles - 1 && i != tempLayoutArray.length - 1) {
+                if(i === contentSettings.auto_break_articles - 1 && i !== tempLayoutArray.length - 1) {
 
                     newLayout += tempLayoutArray[i] + this.getReadMoreSpan(content, contentSettings.read_more_text) + breakString;
                     continue;
@@ -340,7 +380,8 @@ module.exports = function(pb) {
     /**
      * @method formatLayoutForReadMore
      * @param {Object} content
-     * @param {Objct} context
+     * @param {Object} context
+     * @param {boolean} context.readMore
      */
     ArticleRenderer.prototype.formatLayoutForReadMore = function(content, context) {
         var layout = this.getLayout(content);

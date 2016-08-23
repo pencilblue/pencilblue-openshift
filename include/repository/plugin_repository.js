@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2015  PencilBlue, LLC
+    Copyright (C) 2016  PencilBlue, LLC
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -14,6 +14,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+'use strict';
 
 //dependencies
 var async = require('async');
@@ -29,7 +30,7 @@ module.exports = function PluginRepositoryModule(pb) {
      * @type {String}
      */
     var PLUGIN_COLL = 'plugin';
-    
+
     /**
      * @private
      * @static
@@ -38,7 +39,7 @@ module.exports = function PluginRepositoryModule(pb) {
      * @type {String}
      */
     var GLOBAL_SITE = pb.SiteService.GLOBAL_SITE;
-    
+
     /**
      * @private
      * @static
@@ -50,6 +51,7 @@ module.exports = function PluginRepositoryModule(pb) {
 
     /**
      * Empty constructor because this object uses static methods.
+     * @class PluginRepository
      * @constructor
      */
     function PluginRepository() {}
@@ -174,9 +176,9 @@ module.exports = function PluginRepositoryModule(pb) {
             $and: [idIsInTheList, belongsToThisSite]
         };
         var opts = {
-            select: pb.DAO.SELECT_ALL,
+            select: pb.DAO.PROJECT_ALL,
             where: where,
-            order: {created: pb.DAO.ASC}
+            order: [['created', pb.DAO.ASC]]
         };
         var dao = new pb.DAO();
         dao.q(PLUGIN_COLL, opts, cb);
@@ -200,9 +202,9 @@ module.exports = function PluginRepositoryModule(pb) {
             $and: [idIsNotInTheList, belongsToThisSite]
         };
         var opts = {
-            select: pb.DAO.SELECT_ALL,
+            select: pb.DAO.PROJECT_ALL,
             where: where,
-            order: {created: pb.DAO.ASC}
+            order: [['created', pb.DAO.ASC]]
         };
         var dao = new pb.DAO();
         dao.q(PLUGIN_COLL, opts, cb);
@@ -220,18 +222,15 @@ module.exports = function PluginRepositoryModule(pb) {
     };
 
     function getIdsNotInListQuery(pluginIDs) {
-        var idIsInTheList = {uid: {'$nin': pluginIDs}};
-        return idIsInTheList;
+        return {uid: {'$nin': pluginIDs}};
     }
 
     function getIdsInListQuery(pluginIDs) {
-        var idIsInTheList = {uid: {'$in': pluginIDs}};
-        return idIsInTheList;
+        return {uid: {'$in': pluginIDs}};
     }
 
     function getHasThemeQuery() {
-        var hasATheme = {theme: {$exists: true}};
-        return hasATheme;
+        return {theme: {$exists: true}};
     }
 
     function getCorrectIdQuery(pluginID) {

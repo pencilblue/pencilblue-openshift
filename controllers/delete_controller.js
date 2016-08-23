@@ -179,7 +179,7 @@ module.exports = function(pb) {
      *
      * @method getDataOnSuccess
      * @param {Array} results
-     * @return {String}
+     * @return {object}
      */
     DeleteController.prototype.getDataOnSuccess = function(/*results*/) {
         return pb.RequestHandler.generateRedirect(this.getSuccessRedirect());
@@ -191,7 +191,7 @@ module.exports = function(pb) {
      * @return {String}
      */
     DeleteController.prototype.getDefaultErrorMessage = function() {
-        return this.ls.get('ERROR_SAVING');
+        return this.ls.g('generic.ERROR_SAVING');
     };
 
     return DeleteController;

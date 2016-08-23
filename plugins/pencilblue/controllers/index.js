@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2015  PencilBlue, LLC
+    Copyright (C) 2016  PencilBlue, LLC
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@ module.exports = function IndexModule(pb) {
     var TopMenu        = pb.TopMenuService;
     var Comments       = pb.CommentService;
     var ArticleService = pb.ArticleService;
+    var CommentService = pb.CommentService;
 
     /**
      * Index page of the pencilblue theme
@@ -37,13 +38,9 @@ module.exports = function IndexModule(pb) {
     function Index(){}
     util.inherits(Index, pb.BaseController);
 
-    Index.prototype.init = function (props, cb) {
-        var self = this;
-
-        pb.BaseController.prototype.init.call(self, props, function () {
-            self.siteQueryService = new pb.SiteQueryService({site: self.site, onlyThisSite: true});
-            cb();
-        });
+    Index.prototype.initSync = function (/*context*/) {
+        this.siteQueryService = new pb.SiteQueryService({site: this.site, onlyThisSite: true});
+        this.commentService = new CommentService(this.getServiceContext());
     };
 
     Index.prototype.render = function(cb) {
@@ -240,7 +237,7 @@ module.exports = function IndexModule(pb) {
 
         var service = new ArticleService(this.site, true);
         if(this.req.pencilblue_preview) {
-            if(this.req.pencilblue_preview == page || article) {
+            if(this.req.pencilblue_preview === page || article) {
                 if(page) {
                     service.setContentType('page');
                 }
@@ -315,7 +312,7 @@ module.exports = function IndexModule(pb) {
         var self           = this;
         var commentingUser = null;
         if(pb.security.isAuthenticated(this.session)) {
-            commentingUser = Comments.getCommentingUser(this.session.authentication.user);
+            commentingUser = self.commentService.getCommentingUser(this.session.authentication.user);
         }
 
         ts.registerLocal('user_photo', function(flag, cb) {
@@ -339,7 +336,7 @@ module.exports = function IndexModule(pb) {
         ts.registerLocal('display_login', commentingUser ? 'none' : 'block');
         ts.registerLocal('comments_length', util.isArray(content.comments) ? content.comments.length : 0);
         ts.registerLocal('individual_comments', function(flag, cb) {
-            if (!util.isArray(content.comments) || content.comments.length == 0) {
+            if (!util.isArray(content.comments) || content.comments.length === 0) {
                 cb(null, '');
                 return;
             }

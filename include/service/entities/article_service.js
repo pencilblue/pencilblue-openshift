@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2015  PencilBlue, LLC
+ Copyright (C) 2016  PencilBlue, LLC
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -14,24 +14,21 @@
  You should have received a copy of the GNU General Public License
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+'use strict';
 
 //dependencies
 var async = require('async');
 var util  = require('../../util.js');
 
-/**
- * Reusable service classes to be called from controllers
- *
- * @module Services
- */
-module.exports = function ArticleServiceModule(pb) {
+module.exports = function(pb) {
 
     /**
      * Retrieves articles and pages
-     *
+     * @deprecated
      * @class ArticleService
      * @constructor
-     *
+     * @param {string} siteUid
+     * @param {boolean} onlyThisSite
      */
     function ArticleService(siteUid, onlyThisSite){
         this.object_type = ARTICLE_TYPE;
@@ -61,7 +58,7 @@ module.exports = function ArticleServiceModule(pb) {
     var PAGE_TYPE = 'page';
 
     /**
-     * Rerieves the content type
+     * Retrieves the content type
      *
      * @method getContentType
      * @return {String} Content type
@@ -118,7 +115,7 @@ module.exports = function ArticleServiceModule(pb) {
      *
      * @method find
      * @param {Object} where Defines the where clause for the article search
-     * @param {Object} options The options object that can provide query control
+     * @param {Object} [options] The options object that can provide query control
      * parameters
      * @param {Array} [options.order] The order that the results will be returned
      * in.  The default is publish date descending and created descending
@@ -159,7 +156,7 @@ module.exports = function ArticleServiceModule(pb) {
             order = options.order;
         }
         else {
-            order = [{'publish_date': pb.DAO.DESC}, {'created': pb.DAO.DESC}];
+            order = [['publish_date', pb.DAO.DESC], ['created', pb.DAO.DESC]];
         }
 
         //build out select
@@ -168,11 +165,11 @@ module.exports = function ArticleServiceModule(pb) {
             select = options.select;
         }
         else {
-            select = pb.DAO.SELECT_ALL;
+            select = pb.DAO.PROJECT_ALL;
         }
 
         //build out the limit (must be a valid integer)
-        var limit = undefined;
+        var limit;
         if (pb.validation.isInt(options.limit, true, true)) {
             limit = options.limit;
         }
@@ -205,7 +202,7 @@ module.exports = function ArticleServiceModule(pb) {
                             });
                         };
                     });
-                    async.series(tasks, function(err, results) {
+                    async.series(tasks, function(err/*, results*/) {
                         cb(err, articles);
                     });
                 });
@@ -243,6 +240,7 @@ module.exports = function ArticleServiceModule(pb) {
      * @param {Number}   articleCount    The total number of articles
      * @param {Array}    authors         Available authors retrieved from the database
      * @param {Object}   contentSettings Content settings to use for processing
+     * @param {object} [options]
      * @param {Function} cb              Callback function
      */
     ArticleService.prototype.processArticleForDisplay = function(article, articleCount, authors, contentSettings, options, cb) {
@@ -324,7 +322,7 @@ module.exports = function ArticleServiceModule(pb) {
 
                     // Cutoff the article at the right number of paragraphs
                     for(i = 0; i < tempLayoutArray.length && i < contentSettings.auto_break_articles; i++) {
-                        if(i === contentSettings.auto_break_articles -1 && i != tempLayoutArray.length - 1) {
+                        if(i === contentSettings.auto_break_articles -1 && i !== tempLayoutArray.length - 1) {
                             newLayout += tempLayoutArray[i] + '&nbsp;<a href="' + pb.config.siteRoot + '/article/' + article.url + '">' + contentSettings.read_more_text + '...</a>' + breakString;
                             continue;
                         }
@@ -355,13 +353,11 @@ module.exports = function ArticleServiceModule(pb) {
                     where: {
                         article: article[pb.DAO.getIdField()].toString()
                     },
-                    order: {
-                        created: pb.DAO.ASC
-                    }
+                    order: [['created', pb.DAO.ASC]]
                 };
                 var dao   = new pb.DAO();
                 dao.q('comment', opts, function(err, comments) {
-                    if(util.isError(err) || comments.length == 0) {
+                    if(util.isError(err) || comments.length === 0) {
                         return cb(null, null);
                     }
 
@@ -435,7 +431,7 @@ module.exports = function ArticleServiceModule(pb) {
                 //user has not already commented so load
                 var dao = new pb.DAO();
                 dao.loadById(comment.commenter, 'user', function(err, commenter) {
-                    if(util.isError(err) || commenter == null) {
+                    if(util.isError(err) || commenter === null) {
                         callback(null, false);
                         return;
                     }
@@ -449,7 +445,7 @@ module.exports = function ArticleServiceModule(pb) {
                 });
             };
         });
-        async.series(tasks, function(err, result) {
+        async.series(tasks, function(err/*, result*/) {
             cb(err, processedComments);
         });
     };
@@ -507,7 +503,7 @@ module.exports = function ArticleServiceModule(pb) {
         //log deprecation
         pb.log.warn('ArticleService: ArticleService.getMetaInfo is deprecated and will be removed 0.5.0.  Use the prototype function getMetaInfo instead');
 
-        //all wrapped up to ensure we can be multi-threaded here for backwards 
+        //all wrapped up to ensure we can be multi-threaded here for backwards
         //compatibility
         (function(cb) {
 
@@ -550,15 +546,15 @@ module.exports = function ArticleServiceModule(pb) {
          * @property mediaService
          * @type {MediaService}
          */
-        this.mediaService = new pb.MediaService(null, opts.site, opts.onlyThisSite);
-    };
+        this.service = new pb.MediaServiceV2(opts);
+    }
 
     /**
      * Processes an article or page to insert media
-     *
      * @method start
-     * @param  {String}   articleLayout The HTML layout of the article or page
-     * @param  {Function} cb            [description]
+     * @param  {String} articleLayout The HTML layout of the article or page
+     * @param {object} [options]
+     * @param  {Function} cb
      */
     MediaLoader.prototype.start = function(articleLayout, options, cb) {
         if (util.isFunction(options)) {
@@ -580,7 +576,7 @@ module.exports = function ArticleServiceModule(pb) {
         flags.forEach(function(flag) {
             if (!options.media[flag.id]) {
                 idsToRetrieve.push(flag.id);
-            };
+            }
         });
 
         //when all media is already cached just do the processing
@@ -593,7 +589,7 @@ module.exports = function ArticleServiceModule(pb) {
         var opts = {
             where: idsToRetrieve.length === 1 ? pb.DAO.getIdWhere(idsToRetrieve[0]) : pb.DAO.getIdInWhere(idsToRetrieve)
         };
-        this.mediaService.get(opts, function(err, media) {
+        this.service.getAll(opts, function(err, media) {
             if (util.isError(err)) {
                 return cb(err);
             }
@@ -639,6 +635,7 @@ module.exports = function ArticleServiceModule(pb) {
      * Retrieves the media template for rendering media
      * @method getMediaTemplate
      * @param {Object} options
+     * @param {string} [options.mediaTemplatePath='elements/media']
      * @param {Function} cb
      */
     MediaLoader.prototype.getMediaTemplate = function(options, cb) {
@@ -646,9 +643,8 @@ module.exports = function ArticleServiceModule(pb) {
             return cb(null, options.mediaTemplate);
         }
 
-        var templatePath = options.mediaTemplatePath || 'elements/media';
         var ts = new pb.TemplateService(options);
-        ts.load('elements/media', cb);
+        ts.load(options.mediaTemplatePath || 'elements/media', cb);
     };
 
     /**
@@ -663,10 +659,10 @@ module.exports = function ArticleServiceModule(pb) {
             return [];
         }
 
+        var index;
         var flags = [];
-        var index = 0;
         while( (index = layout.indexOf('^media_display_')) >= 0) {
-            flags.push(pb.MediaService.extractNextMediaFlag(layout));
+            flags.push(pb.MediaServiceV2.extractNextMediaFlag(layout));
 
             var nexPosition = layout.indexOf('^', index + 1);
             layout = layout.substr(nexPosition);
@@ -679,15 +675,14 @@ module.exports = function ArticleServiceModule(pb) {
      * @method replaceMediaTag
      * @param {String}   layout        The HTML layout of the article or page
      * @param {String}   mediaTemplate The template of the media embed
+     * @param {object} mediaCache
      * @param {Function} cb            Callback function
      */
     MediaLoader.prototype.replaceMediaTag = function(layout, mediaTemplate, mediaCache, cb) {
-        var flag = pb.MediaService.extractNextMediaFlag(layout);
+        var flag = pb.MediaServiceV2.extractNextMediaFlag(layout);
         if (!flag) {
             return cb(null, layout);
         }
-
-        var mediaStyleString = flag.style;
 
         var data = mediaCache[flag.id];
         if (!data) {
@@ -698,9 +693,7 @@ module.exports = function ArticleServiceModule(pb) {
         //ensure the max height is set if explicity set for media replacement
         var options = {
             view: 'post',
-            style: {
-
-            },
+            style: {},
             attrs: {
                 frameborder: "0",
                 allowfullscreen: ""
@@ -709,13 +702,13 @@ module.exports = function ArticleServiceModule(pb) {
         if (flag.style.maxHeight) {
             options.style['max-height'] = flag.style.maxHeight;
         }
-        this.mediaService.render(data, options, function(err, html) {
+        this.service.render(data, options, function(err, html) {
             if (util.isError(err)) {
                 return cb(err);
             }
 
             //get the style for the container
-            var containerStyleStr = pb.MediaService.getStyleForPosition(flag.style.position) || '';
+            var containerStyleStr = pb.MediaServiceV2.getStyleForPosition(flag.style.position) || '';
 
             //finish up replacements
             var mediaEmbed = mediaTemplate.split('^media^').join(html);

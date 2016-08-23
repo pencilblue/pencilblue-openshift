@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2015  PencilBlue, LLC
+    Copyright (C) 2016  PencilBlue, LLC
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -61,8 +61,7 @@ module.exports = function SimpleLayeredServiceModule(pb) {
                 instance.services[i].get(key, function(err, result){
                     if (util.isError(err)){
                         resultNotFound = false;
-                        callback(err);
-                        return;
+                        return callback(err);
                     }
 
                     if (result || (typeof result === 'boolean' && result === false)) {

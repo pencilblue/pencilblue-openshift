@@ -2,14 +2,15 @@ var url      = require('url');
 var async    = require('async');
 var util     = require('../util.js');
 
-module.exports = function DBMigrateModule(pb) {
+module.exports = function (pb) {
+
     /**
      * Array of collections used to append a "site" value to all documents
      * @private
      * @static
      * @readonly
      * @property MIGRATE_ALL
-     * @type {string[]}
+     * @type {Array}
      */
     var MIGRATE_ALL = [
         'article',
@@ -31,7 +32,7 @@ module.exports = function DBMigrateModule(pb) {
      * @static
      * @readonly
      * @property SITE_SPECIFIC_USERS
-     * @type {string[]}
+     * @type {Array}
      */
     var SITE_SPECIFIC_USERS = [
         pb.security.ACCESS_EDITOR,
@@ -45,7 +46,7 @@ module.exports = function DBMigrateModule(pb) {
      * @static
      * @readonly
      * @property SITE_SPECIFIC_SETTINGS
-     * @type {string[]}
+     * @type {Array}
      */
     var SITE_SPECIFIC_SETTINGS = [
         'active_theme',
@@ -57,20 +58,31 @@ module.exports = function DBMigrateModule(pb) {
     /**
      * On run, transforms a single tenant instance to a multi-tenant instance where the site defined
      * in the single tenant instance becomes a site under global's scope.
-     * @constructor DBMigrate
+     * @class DBMigrate
+     * @constructor
      */
     function DBMigrate() {
 
+        /**
+         * @method run
+         * @param {Function} cb
+         */
         this.run = function (cb) {
             var self = this;
             var siteService = new pb.SiteService();
             siteService.getSiteMap(function (err, result) {
+                if (util.isError(err)) {
+                    return cb(err);
+                }
                 if (!pb.config.multisite.enabled || result.active.length > 0 || result.inactive.length > 0) {
                     return cb(null, true);
                 }
 
-                self.createSite(function (err, isTaken, field, result) {
-                    self.siteUid = result.uid;
+                self.createSite(function (err, result) {
+                    if (util.isError(err)) {
+                        return cb(err);
+                    }
+                    self.siteUid = result.site.uid;
                     var tasks = [
                         util.wrapTask(self, self.migrateContentAndPluginData),
                         util.wrapTask(self, self.migrateSettings),
@@ -81,15 +93,23 @@ module.exports = function DBMigrateModule(pb) {
             });
         };
 
+        /**
+         * @method createSite
+         * @param {Function} cb
+         */
         this.createSite = function (cb) {
-            var siteService = new pb.SiteService();
-            var site = pb.DocumentCreator.create('site', {
+            var site = {
                 displayName: pb.config.siteName,
                 hostname: url.parse(pb.config.siteRoot).host
-            });
-            siteService.createSite(site, '', cb);
+            };
+            var siteService = new pb.SiteService();
+            siteService.createSite(site, cb);
         };
 
+        /**
+         * @method migrateContentAndPluginData
+         * @param {Function} cb
+         */
         this.migrateContentAndPluginData = function(cb) {
             var self = this;
             var tasks = util.getTasks(MIGRATE_ALL, function (collections, i) {
@@ -101,14 +121,29 @@ module.exports = function DBMigrateModule(pb) {
             async.parallel(tasks, cb);
         };
 
+        /**
+         * @method migrateSettings
+         * @param {Function} cb
+         */
         this.migrateSettings = function (cb) {
             this.migrateGlobalSubCollection('setting', SITE_SPECIFIC_SETTINGS, 'key', cb);
         };
 
+        /**
+         * @method migrateUsers
+         * @param {Function} cb
+         */
         this.migrateUsers = function(cb) {
             this.migrateGlobalSubCollection('user', SITE_SPECIFIC_USERS, 'admin', cb);
         };
 
+        /**
+         * @method migrateGlobalSubCollection
+         * @param {string} collection
+         * @param {Array} siteSpecificArr
+         * @param {*} compareTo
+         * @param {Function} cb
+         */
         this.migrateGlobalSubCollection = function(collection, siteSpecificArr, compareTo, cb) {
             var self = this;
             var dao = new pb.DAO();
@@ -124,6 +159,12 @@ module.exports = function DBMigrateModule(pb) {
             });
         };
 
+        /**
+         * @method migrateCollection
+         * @param {string} collection
+         * @param {string} siteUid
+         * @param {Function} cb
+         */
         this.migrateCollection = function (collection, siteUid, cb) {
             var self = this;
             var dao = new pb.DAO();
@@ -138,6 +179,12 @@ module.exports = function DBMigrateModule(pb) {
             });
         };
 
+        /**
+         * @method applySiteToDocument
+         * @param {object} document
+         * @param {string} siteUid
+         * @param {Function} callback
+         */
         this.applySiteToDocument = function (document, siteUid, callback) {
             document[pb.SiteService.SITE_FIELD] = siteUid;
             var dao = new pb.DAO();

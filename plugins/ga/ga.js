@@ -1,9 +1,23 @@
+/*
+ Copyright (C) 2016  PencilBlue, LLC
 
-module.exports = function GoogleAnalyticsModule(pb) {
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
 
-    //pb dependencies
-    var util = pb.util;
-    
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+'use strict';
+
+module.exports = function (pb) {
+
     /**
      * GoogleAnalytics - A sample for exemplifying what the main module file should
      * look like.
@@ -12,7 +26,7 @@ module.exports = function GoogleAnalyticsModule(pb) {
      * @constructor
      */
     function GoogleAnalytics(){}
-    
+
     /**
      * The ID for the analytics provider
      * @private
@@ -25,11 +39,13 @@ module.exports = function GoogleAnalyticsModule(pb) {
 
     /**
      * Called when the application is being installed for the first time.
-     *
-     * @param cb A callback that must be called upon completion.  cb(err, result).
+     * @static
+     * @method onInstallWithContext
+     * @param {object} context
+     * @param {function} cb (Error, boolean) A callback that must be called upon completion.
      * The result is ignored
      */
-    GoogleAnalytics.onInstall = function(cb) {
+    GoogleAnalytics.onInstallWithContext = function(context, cb) {
         cb(null, true);
     };
 
@@ -37,12 +53,15 @@ module.exports = function GoogleAnalyticsModule(pb) {
      * Called when the application is uninstalling this plugin.  The plugin should
      * make every effort to clean up any plugin-specific DB items or any in function
      * overrides it makes.
-     *
-     * @param cb A callback that must be called upon completion.  cb(err, result).
+     * @static
+     * @method onUninstallWithContext
+     * @param {object} context
+     * @param {string} context.site
+     * @param {function} cb (Error, boolean) A callback that must be called upon completion.
      * The result is ignored
      */
-    GoogleAnalytics.onUninstall = function(cb) {
-        var result = pb.AnalyticsManager.unregisterProvider(PROVIDER_NAME);
+    GoogleAnalytics.onUninstallWithContext = function(context, cb) {
+        var result = pb.AnalyticsManager.unregisterProvider(PROVIDER_NAME, context.site);
         cb(null, result);
     };
 
@@ -50,45 +69,46 @@ module.exports = function GoogleAnalyticsModule(pb) {
      * Called when the application is starting up. The function is also called at
      * the end of a successful install. It is guaranteed that all core PB services
      * will be available including access to the core DB.
-     *
-     * @param cb A callback that must be called upon completion.  cb(err, result).
+     * @static
+     * @method onStartupWithContext
+     * @param {object} context
+     * @param {string} context.site
+     * @param {function} cb (Error, boolean) A callback that must be called upon completion.
      * The result is ignored
      */
-    GoogleAnalytics.onStartup = function(cb) {
-        var result = pb.AnalyticsManager.registerProvider(PROVIDER_NAME, GoogleAnalytics.onRequest);
+    GoogleAnalytics.onStartupWithContext = function(context, cb) {
+        var result = pb.AnalyticsManager.registerProvider(PROVIDER_NAME, context.site, GoogleAnalytics.onRequest);
         cb(null, result);
     };
-    
+
     /**
-     * Called on each request
-     *
+     * Called on each request.  Creates the HTML snippet that will be used for the request
+     * @static
+     * @method onRequest
+     * @param {Request} req
+     * @param {object} session
+     * @param {Localization} ls
+     * @param {function} cb (Error, string)
      */
     GoogleAnalytics.onRequest = function(req, session, ls, cb) {
-        var siteId = pb.RequestHandler.sites[req.headers.host] ? pb.RequestHandler.sites[req.headers.host].uid : null;
-        var pluginService = new pb.PluginService({site: pb.SiteService.getCurrentSite(siteId)});
-        pluginService.getSettingsKV('ga', function(err, settings) {
-            if (util.isError(err)) {
-                return cb(err, '');
-            }
-            else if (!settings || !settings.google_analytics_tracking_id || settings.google_analytics_tracking_id.length === 0) {
-                pb.log.warn('GoogleAnalytics: Settings have not been initialized!');
-                return cb(null, '');
-            }
-
-            var trackingId          = settings.google_analytics_tracking_id;
-            var demographicsSupport = settings.demographics_support;
-            var website             = pb.config.siteRoot.split('http://').join('').split('https://').join('');
-            var script              = "<script>(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)})(window,document,'script','//www.google-analytics.com/analytics.js','ga');ga('create', '" + trackingId + "', '" + website + "');" + (demographicsSupport ? "ga('require', 'displayfeatures');" : "") + "ga('send', 'pageview');</script>";
-
-            cb(null, script);
-        });
+        var siteId = pb.SiteService.getCurrentSite(pb.RequestHandler.sites[req.headers.host] ? pb.RequestHandler.sites[req.headers.host].uid : null);
+        var context = {
+            site: siteId,
+            pluginService: new pb.PluginService({site: siteId}),
+            req: req,
+            session: session,
+            ls: ls
+        };
+        var gaRenderService = new (pb.PluginService.getService('GoogleAnalyticsRenderService', 'ga', siteId))(context);
+        gaRenderService.render(cb);
     };
 
     /**
      * Called when the application is gracefully shutting down.  No guarantees are
      * provided for how much time will be provided the plugin to shut down.
-     *
-     * @param cb A callback that must be called upon completion.  cb(err, result).
+     * @static
+     * @method onShutdown
+     * @param {function} cb (Error, boolean) A callback that must be called upon completion.  cb(err, result).
      * The result is ignored
      */
     GoogleAnalytics.onShutdown = function(cb) {

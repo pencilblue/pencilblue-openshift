@@ -1,5 +1,5 @@
 /*
- Copyright (C) 2015  PencilBlue, LLC
+ Copyright (C) 2016  PencilBlue, LLC
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -122,7 +122,7 @@ module.exports = function SiteServiceModule(pb) {
      */
     SiteService.prototype.getAllSites = function(cb) {
         var dao = new pb.DAO();
-        dao.q(SITE_COLL, { select: pb.DAO.SELECT_ALL, where: {} }, cb);
+        dao.q(SITE_COLL, { select: pb.DAO.PROJECT_ALL, where: {} }, cb);
     };
 
     /**
@@ -132,7 +132,7 @@ module.exports = function SiteServiceModule(pb) {
      */
     SiteService.prototype.getActiveSites = function(cb) {
         var dao = new pb.DAO();
-        dao.q(SITE_COLL, { select: pb.DAO.SELECT_ALL, where: {active: true} }, cb);
+        dao.q(SITE_COLL, { select: pb.DAO.PROJECT_ALL, where: {active: true} }, cb);
     };
 
     /**
@@ -172,7 +172,7 @@ module.exports = function SiteServiceModule(pb) {
      */
     SiteService.prototype.getSiteNameByUid = function(uid, cb) {
         var dao = new pb.DAO();
-        dao.q(SITE_COLL, {select: pb.DAO.SELECT_ALL, where: {uid: uid} }, function(err, result) {
+        dao.q(SITE_COLL, {select: pb.DAO.PROJECT_ALL, where: {uid: uid} }, function(err, result) {
             var siteName = (!uid || uid === SiteService.GLOBAL_SITE) ? 'global' : '';
 
             if (pb.util.isError(err)) {
@@ -246,7 +246,7 @@ module.exports = function SiteServiceModule(pb) {
      * @method activateSite
      * @param {String} siteUid - site unique id
      * @param {Function} cb - callback to run after job is completed
-     * @returns {String} the job id
+     * @return {String} the job id
      */
     SiteService.prototype.activateSite = function(siteUid, cb) {
         cb = cb || util.cb;
@@ -265,7 +265,7 @@ module.exports = function SiteServiceModule(pb) {
      * @method deactivateSite
      * @param {String} siteUid - site unique id
      * @param {Function} cb - callback to run after job is completed
-     * @returns {String} the job id
+     * @return {String} the job id
      */
     SiteService.prototype.deactivateSite = function(siteUid, cb) {
         cb = cb || util.cb;
@@ -286,11 +286,11 @@ module.exports = function SiteServiceModule(pb) {
      * @param {String} options.hostname - result of site hostname edit/create
      * @param {String} options.displayName - result of site display name edit/create
      * @param {Function} cb - callback to run after job is completed
-     * @returns {String} the job id
+     * @return {String} the job id
      */
     SiteService.prototype.editSite = function(options, cb) {
         cb = cb || util.cb;
-        var name = util.format("EDIT_SITE%s", options.site);
+        var name = util.format("EDIT_SITE%s", options.uid);
         var job = new pb.SiteCreateEditJob();
         job.setRunAsInitiator(true);
         job.init(name);
@@ -303,10 +303,8 @@ module.exports = function SiteServiceModule(pb) {
      * Creates a site and saves it to the database.
      * @method createSite
      * @param {Object} options - object containing site fields
-     * @param {String} options.uid - site unique id
      * @param {String} options.hostname - result of site hostname edit/create
      * @param {String} options.displayName - result of site display name edit/create
-     * @param {String} id - the site unique identifier for the database
      * @param {Function} cb - callback function
      */
     SiteService.prototype.createSite = function(options, cb) {
@@ -493,13 +491,13 @@ module.exports = function SiteServiceModule(pb) {
     };
 
     /**
-     * Returns true if siteid given is global or non-existant (to remain backwards compatible)
+     * Returns true if siteId given is global or non-existent (to remain backwards compatible)
      * @method isGlobal
-     * @param {String} siteid - the site id to check
-     * @returns {Boolean} true if global or does not exist
+     * @param {String} siteId - the site id to check
+     * @return {Boolean} true if global or does not exist
      */
-    SiteService.isGlobal = function (siteid) {
-        return (!siteid || siteid === SiteService.GLOBAL_SITE);
+    SiteService.isGlobal = function (siteId) {
+        return (!siteId || siteId === SiteService.GLOBAL_SITE);
     };
 
     /**
@@ -531,7 +529,7 @@ module.exports = function SiteServiceModule(pb) {
      * Central place to get the current site. Backwards compatible cleansing
      * @method getCurrentSite
      * @param {String} siteid - site is to cleanse
-     * @returns {String} SiteService.GLOBAL_SITE if not specified, or siteid otherwise
+     * @return {String} SiteService.GLOBAL_SITE if not specified, or siteid otherwise
      */
     SiteService.getCurrentSite = function (siteid) {
         return siteid || SiteService.GLOBAL_SITE;
@@ -541,7 +539,7 @@ module.exports = function SiteServiceModule(pb) {
      * Return site field from object.
      * @method getSiteFromObject
      * @param {Object} object
-     * @returns {String} the value of the object's site field key
+     * @return {String} the value of the object's site field key
      */
     SiteService.getSiteFromObject = function (object) {
         if (!object) {
@@ -554,7 +552,7 @@ module.exports = function SiteServiceModule(pb) {
      * Determine whether http or https is being used for the site and return hostname attached to http(s)
      * @method getHostWithProtocol
      * @param {String} hostname
-     * @returns {String} hostname with protocol attached
+     * @return {String} hostname with protocol attached
      */
     SiteService.getHostWithProtocol = function(hostname) {
         hostname = hostname.match(/^http/g) ? hostname : "//" + hostname;
@@ -568,28 +566,28 @@ module.exports = function SiteServiceModule(pb) {
      * @param {String} siteId
      * @param {Function} cb
      */
-    SiteService.prototype.deleteSiteSpecificContent = function (siteid, cb) {
+    SiteService.prototype.deleteSiteSpecificContent = function (siteId, cb) {
         var siteQueryService = new pb.SiteQueryService();
         siteQueryService.getCollections(function(err, allCollections) {
             var dao = new pb.DAO();
 
             var tasks = util.getTasks(allCollections, function (collections, i) {
                 return function (taskCallback) {
-                    dao.delete({site: siteid}, collections[i].name, function (err, commandResult) {
+                    dao.delete({site: siteId}, collections[i].name, function (err, commandResult) {
                         if (util.isError(err) || !commandResult) {
                             return taskCallback(err);
                         }
 
                         taskCallback(null, {collection: collections[i].name});
                     });
-                }
+                };
             });
             async.parallel(tasks, function (err, results) {
                 if (pb.util.isError(err)) {
                     pb.log.error(err);
                     return cb(err);
                 }
-                pb.log.silly("Successfully deleted site %s from database", siteid);
+                pb.log.silly("Successfully deleted site %s from database", siteId);
                 cb(null, results);
             });
         });
@@ -606,9 +604,9 @@ module.exports = function SiteServiceModule(pb) {
             displayName: pb.config.siteName,
             uid: pb.SiteService.GLOBAL_SITE,
             hostname: pb.config.multisite.enabled ? url.parse(pb.config.multisite.globalRoot).host : url.parse(pb.config.siteRoot).host,
-            active: pb.config.multisite.enabled ? false : true,
+            active: !pb.config.multisite.enabled,
             defaultLocale: pb.Localization.getDefaultLocale(),
-            supportedLocales: util.arrayToObj(pb.Localization.getSupported(), function(a, i) { return a[i]; }, function(a, i) { return true; }),
+            supportedLocales: util.arrayToObj(pb.Localization.getSupported(), function(a, i) { return a[i]; }, function() { return true; }),
             prevHostnames: []
         };
     };
@@ -621,7 +619,7 @@ module.exports = function SiteServiceModule(pb) {
             // Check for circular hostname references
             data.prevHostnames = data.prevHostnames.filter(function (hostname) {
                 return hostname !== newHostname;
-            })
+            });
             data.prevHostnames.push(prevHostname);
             pb.RequestHandler.redirectHosts[prevHostname] = newHostname;
             pb.RequestHandler.sites[prevHostname] = null;

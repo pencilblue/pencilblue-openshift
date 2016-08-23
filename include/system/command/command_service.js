@@ -1,25 +1,25 @@
 /*
-    Copyright (C) 2015  PencilBlue, LLC
+ Copyright (C) 2016  PencilBlue, LLC
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+'use strict';
 
 //dependencies
-var process = require('process');
-var async   = require('async');
-var domain  = require('domain');
-var util    = require('../../util.js');
+var async = require('async');
+var domain = require('domain');
+var util = require('../../util.js');
 
 module.exports = function CommandServiceModule(pb) {
 
@@ -30,15 +30,15 @@ module.exports = function CommandServiceModule(pb) {
      * @constructor
      * @param {CommandBroker} broker
      */
-    function CommandService(broker){
+    function CommandService(broker) {
         if (!broker) {
             throw new Error('The broker parameter is required');
         }
-        this.broker           = broker;
-        this.registrants      = {};
+        this.broker = broker;
+        this.registrants = {};
         this.awaitingResponse = {};
-    };
-    
+    }
+
     /**
      * The singleton instance
      * @private
@@ -47,7 +47,16 @@ module.exports = function CommandServiceModule(pb) {
      * @type {CommandService}
      */
     var INSTANCE = null;
-    
+
+    /**
+     * The singleton instance
+     * @private
+     * @static
+     * @property INITIALIZED
+     * @type {boolean}
+     */
+    var INITIALIZED = false;
+
     /**
      * The default timeout in milliseconds (2 seconds)
      * @private
@@ -57,7 +66,7 @@ module.exports = function CommandServiceModule(pb) {
      * @type {Integer}
      */
     var DEFAULT_TIMEOUT = 2000;
-  
+
     /**
      * A hash of the brokers that are available out of the box
      * @private
@@ -65,10 +74,28 @@ module.exports = function CommandServiceModule(pb) {
      * @property AWAITING_RESPONSE
      * @type {Object}
      */
-    var DEFALULT_BROKERS = {
+    var DEFAULT_BROKERS = {
         redis: pb.RedisCommandBroker,
         mongo: pb.MongoCommandBroker
     };
+
+    /**
+     * Indicates that an error occurrred while attempting to check if a handler was registered
+     * @static
+     * @readonly
+     * @property ERROR_INDEX
+     * @type {number}
+     */
+    CommandService.ERROR_INDEX = -2;
+
+    /**
+     * Indicates that the handler was not found
+     * @static
+     * @readonly
+     * @property NOT_FOUND
+     * @type {number}
+     */
+    CommandService.NOT_FOUND = -1;
 
     /**
      * Initializes the service and the broker implementation.  The broker is
@@ -78,23 +105,27 @@ module.exports = function CommandServiceModule(pb) {
      * @method init
      * @param {Function} cb A callback that takes two parameters: cb(Error, TRUE/FALSE)
      */
-    CommandService.prototype.init = function(cb) {
+    CommandService.prototype.init = function (cb) {
+        if (INITIALIZED) {
+            return cb(null, true);
+        }
         pb.log.debug('CommandService: Initializing...');
 
         //instantiate the command broker
         var self = this;
-        this.broker.init(function(err, result) {
+        this.broker.init(function (err) {
             if (util.isError(err)) {
                 return cb(err);
             }
 
-            self.broker.subscribe(pb.ServerRegistration.generateKey(), CommandService.onCommandReceived(self), cb);
+            self.broker.subscribe(pb.ServerRegistration.generateKey(), CommandService.onCommandReceived(self), function(error, result) {
+                INITIALIZED = !util.isError(error);
+                cb(err, result);
+            });
         });
 
         //register for events
-        pb.system.registerShutdownHook('CommandService', function(cb) {
-            self.shutdown(cb);
-        });
+        pb.system.registerShutdownHook('CommandService', util.wrapTask(this, this.shutdown));
     };
 
     /**
@@ -102,7 +133,7 @@ module.exports = function CommandServiceModule(pb) {
      * @method shutdown
      * @param {Function} cb A callback that takes two parameters: cb(Error, TRUE/FALSE)
      */
-    CommandService.prototype.shutdown = function(cb) {
+    CommandService.prototype.shutdown = function (cb) {
         pb.log.debug('CommandService: Shutting down...');
 
         this.registrants = {};
@@ -121,8 +152,9 @@ module.exports = function CommandServiceModule(pb) {
      * object.
      * @return {Boolean} TRUE if the the handler was registered, FALSE if not.
      */
-    CommandService.prototype.registerForType = function(type, handler) {
-        if (!pb.validation.validateNonEmptyStr(type, true) || !util.isFunction(handler)) {
+    CommandService.prototype.registerForType = function (type, handler) {
+        var result = this.isRegistered(type, handler);
+        if (result !== CommandService.NOT_FOUND && !!this.registrants[type]) {
             return false;
         }
 
@@ -143,19 +175,36 @@ module.exports = function CommandServiceModule(pb) {
      * @param {Function} handler The handler function to unregister
      * @return {Boolean} TRUE if the handler was unregistered, FALSE if not.
      */
-    CommandService.prototype.unregisterForType = function(type, handler) {
-        if (!pb.validation.validateNonEmptyStr(type, true) || !util.isFunction(handler) || !util.isArray(this.registrants[type])) {
-            return false;
+    CommandService.prototype.unregisterForType = function (type, handler) {
+        var index = this.isRegistered(type, handler);
+        var result = index > CommandService.NOT_FOUND;
+        if (result) {
+            this.registrants[type].splice(index, 1);
+        }
+        return result;
+    };
+
+    /**
+     * Determines if the provided handler is registered for the given type.
+     * @method isRegistered
+     * @param type
+     * @param handler
+     * @return {number} The index in the storage array where the handle to
+     * the function is kept.  CommandService.NOT_FOUND if the handle is not
+     * registered for the type.  CommandService.ERROR_INDEX when the
+     * parameters are invalid.
+     */
+    CommandService.prototype.isRegistered = function (type, handler) {
+        if (!pb.ValidationService.isNonEmptyStr(type, true) || !util.isFunction(handler) || !util.isArray(this.registrants[type])) {
+            return CommandService.ERROR_INDEX;
         }
 
-        //search for registrant.  remove it if found
         for (var i = 0; i < this.registrants[type].length; i++) {
             if (handler === this.registrants[type][i]) {
-                this.registrants[type].splice(i, 1);
-                return true;
+                return i;
             }
         }
-        return false;
+        return CommandService.NOT_FOUND;
     };
 
     /**
@@ -166,13 +215,13 @@ module.exports = function CommandServiceModule(pb) {
      * @method notifyOfCommand
      * @param {Object} command The command to delegate
      */
-    CommandService.prototype.notifyOfCommand = function(command) {
+    CommandService.prototype.notifyOfCommand = function (command) {
         if (!util.isObject(command)) {
             return;
         }
 
         var type = command.type;
-        if (!pb.validation.validateNonEmptyStr(type, true)) {
+        if (!pb.ValidationService.isNonEmptyStr(type, true)) {
             return;
         }
 
@@ -194,8 +243,8 @@ module.exports = function CommandServiceModule(pb) {
 
         //emit command to each handler
         var self = this;
-        var emitFunction = function(type, i, command){
-            return function() {
+        var emitFunction = function (type, i, command) {
+            return function () {
                 self.registrants[type][i](command);
             };
         };
@@ -224,7 +273,7 @@ module.exports = function CommandServiceModule(pb) {
      * index of the task being executed and the second is the total number of tasks.
      * @param {Function} cb A callback that provides two parameters: cb(Error, Array)
      */
-    CommandService.prototype.sendCommandToAllGetResponses = function(type, options, cb) {
+    CommandService.prototype.sendCommandToAllGetResponses = function (type, options, cb) {
         if (util.isFunction(options)) {
             cb = options;
             options = {};
@@ -247,21 +296,21 @@ module.exports = function CommandServiceModule(pb) {
         //get all proceses in the cluster
         var self = this;
         var serverResigration = pb.ServerRegistration.getInstance();
-        serverResigration.getClusterStatus(function(err, statuses) {
+        serverResigration.getClusterStatus(function (err, statuses) {
             if (util.isError(err)) {
                 cb(err);
                 return;
             }
 
-            var me    = null;
+            var me = null;
             var myKey = pb.ServerRegistration.generateKey();
-            var tasks = util.getTasks(statuses, function(statuses, i) {
+            var tasks = util.getTasks(statuses, function (statuses, i) {
                 if (myKey === statuses[i]._id) {
                     me = i;
                 }
 
                 //create the task function
-                return function(callback) {
+                return function (callback) {
 
                     //make progress callback
                     if (progressCb) {
@@ -270,10 +319,10 @@ module.exports = function CommandServiceModule(pb) {
 
                     //create command
                     var opts = util.clone(options);
-                    opts.to  = statuses[i].id;
+                    opts.to = statuses[i].id;
 
                     //execute command against the cluster
-                    self.sendCommandGetResponse(type, opts, function(err, command) {
+                    self.sendCommandGetResponse(type, opts, function (err, command) {
                         var result = {
                             err: err ? err.stack : undefined,
                             command: command
@@ -302,34 +351,34 @@ module.exports = function CommandServiceModule(pb) {
      * @param {Integer} [options.timeout]
      * @param{Function} onResponse
      */
-    CommandService.prototype.sendCommandGetResponse = function(type, options, onResponse) {
-        if (!util.isObject(options) || !pb.validation.validateNonEmptyStr(options.to, true)) {
+    CommandService.prototype.sendCommandGetResponse = function (type, options, onResponse) {
+        if (!util.isObject(options) || !pb.validation.isNonEmptyStr(options.to, true)) {
             return onResponse(new Error('A to field must be provided when expecting a response to a message.'));
         }
 
-        var self   = this;
-        var doSend = function(type, options, onResponse) {
+        var self = this;
+        var doSend = function (type, options, onResponse) {
 
             var timeout = options.timeout || pb.config.command.timeout || DEFAULT_TIMEOUT;
-            var d       = domain.create();
+            var d = domain.create();
             d.on('error', onResponse);
-            d.run(function() {
-                self.sendCommand(type, options, function(err, commandId) {
+            d.run(function () {
+                self.sendCommand(type, options, function (err, commandId) {
                     if (util.isError(err)) {
                         onResponse(err);
                         return;
                     }
-                    else if (!pb.validation.validateNonEmptyStr(commandId, true)) {
+                    else if (!pb.validation.isNonEmptyStr(commandId, true)) {
                         onResponse(new Error('Failed to publish the command to the cluster'));
                         return;
                     }
 
-                    var handle = setTimeout(function() {
+                    var handle = setTimeout(function () {
                         delete self.awaitingResponse[commandId];
-                        onResponse(new Error('Timed out waiting for response to command ['+commandId+']'));
+                        onResponse(new Error('Timed out waiting for response to command [' + commandId + ']'));
                         handle = null;
                     }, timeout);
-                    self.awaitingResponse[commandId] = function(command) {
+                    self.awaitingResponse[commandId] = function (command) {
                         if (handle) {
                             clearTimeout(handle);
                             handle = null;
@@ -342,7 +391,7 @@ module.exports = function CommandServiceModule(pb) {
                     };
                 });
             });
-        }
+        };
         doSend(type, options, onResponse);
     };
 
@@ -351,9 +400,9 @@ module.exports = function CommandServiceModule(pb) {
      * @method sendInResponseTo
      * @param {Object} command The command that was sent to ths process
      * @param {Object} responseCommand The command to send back to the entity that sent the first command.
-     * @param {Function} cb A callback that provides two parameters: cb(Error, Command ID)
+     * @param {Function} [cb] A callback that provides two parameters: cb(Error, Command ID)
      */
-    CommandService.prototype.sendInResponseTo = function(command, responseCommand, cb) {
+    CommandService.prototype.sendInResponseTo = function (command, responseCommand, cb) {
         if (!util.isObject(command)) {
             return cb(new Error('The command parameter must be an object'));
         }
@@ -366,8 +415,8 @@ module.exports = function CommandServiceModule(pb) {
         cb = cb || util.cb;
 
         //complete the response
-        responseCommand.id      = util.uniqueId();
-        responseCommand.to      = command.from;
+        responseCommand.id = util.uniqueId();
+        responseCommand.to = command.from;
         responseCommand.replyTo = command.id;
 
         //send the response
@@ -383,15 +432,15 @@ module.exports = function CommandServiceModule(pb) {
      * @param {String} [options.to] The cluster process that should handle the message
      * @param {Function} [cb] A callback that provides two parameters: cb(Error, Command ID)
      */
-    CommandService.prototype.sendCommand = function(type, options, cb) {
-        if (!pb.validation.validateNonEmptyStr(type, true)) {
+    CommandService.prototype.sendCommand = function (type, options, cb) {
+        if (!pb.ValidationService.isNonEmptyStr(type, true)) {
             return cb(new Error("The command type is required"));
         }
         else if (util.isFunction(options)) {
             cb = options;
             options = {};
         }
-        else if (!pb.validation.validateObject(options, false)) {
+        else if (!pb.ValidationService.isObj(options, false)) {
             return cb(new Error('When provided the options parameter must be an object'));
         }
 
@@ -415,8 +464,12 @@ module.exports = function CommandServiceModule(pb) {
         }
 
         //instruct the broker to broadcast the command
-        this.broker.publish(options.to, options, function(err, result) {
-            cb(err, result ? options.id : null);
+        var tasks = [
+            util.wrapTask(this, this.init),
+            util.wrapTask(this.broker, this.broker.publish, [options.to, options])
+        ];
+        async.series(tasks, function (err, results) {
+            cb(err, results[tasks.length - 1] ? options.id : null);
         });
     };
 
@@ -427,13 +480,12 @@ module.exports = function CommandServiceModule(pb) {
      * handoff to the function that will delegate out to the handlers.
      * @static
      * @method onCommandReceived
-     * @param {String} channel The channel to listen for incoming commands
-     * @param {Object} command The command to verify and delegate
-     * @return {Function}
+     * @param {CommandService} commandService
+     * @return {Function} (string, object)
      */
-    CommandService.onCommandReceived = function(commandService) {
-        return function(channel, command) {
-            
+    CommandService.onCommandReceived = function (commandService) {
+        return function (channel, command) {
+
             var uid = pb.ServerRegistration.generateKey();
             if (command.to === uid || command.to === null || command.to === undefined) {
                 commandService.notifyOfCommand(command);
@@ -444,27 +496,27 @@ module.exports = function CommandServiceModule(pb) {
             }
         };
     };
-    
+
     /**
      * Retrieves the singleton instance of CommandService.
      * @static
      * @method getInstance
      * @return {CommandService}
      */
-    CommandService.getInstance = function() {
+    CommandService.getInstance = function () {
         if (INSTANCE) {
             return INSTANCE;
         }
-        
+
         //figure out which broker to use
         var CommandBroker = null;
-        if (DEFALULT_BROKERS[pb.config.command.broker]) {
-            CommandBroker = DEFALULT_BROKERS[pb.config.command.broker]
+        if (DEFAULT_BROKERS[pb.config.command.broker]) {
+            CommandBroker = DEFAULT_BROKERS[pb.config.command.broker]
         }
         else {
             CommandBroker = require(pb.config.command.broker)(pb);
         }
-        
+
         var broker = new CommandBroker();
         return INSTANCE = new CommandService(broker);
     };

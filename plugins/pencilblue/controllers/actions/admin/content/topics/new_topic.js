@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2015  PencilBlue, LLC
+    Copyright (C) 2016  PencilBlue, LLC
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -16,10 +16,10 @@
 */
 
 module.exports = function(pb) {
-    
+
     //pb dependencies
     var util = pb.util;
-    
+
     /**
      * Creates a new topic
      */
@@ -43,7 +43,7 @@ module.exports = function(pb) {
                 if(count > 0) {
                     cb({
                         code: 400,
-                        content: pb.BaseController.apiResponse(pb.BaseController.API_ERROR, self.ls.get('EXISTING_TOPIC'))
+                        content: pb.BaseController.apiResponse(pb.BaseController.API_ERROR, self.ls.g('topics.EXISTING_TOPIC'))
                     });
                     return;
                 }
@@ -53,11 +53,11 @@ module.exports = function(pb) {
                     if(util.isError(err)) {
                         return cb({
                             code: 500,
-                            content: pb.BaseController.apiResponse(pb.BaseController.API_ERROR, self.ls.get('ERROR_SAVING'))
+                            content: pb.BaseController.apiResponse(pb.BaseController.API_ERROR, self.ls.g('generic.ERROR_SAVING'))
                         });
                     }
 
-                    cb({content: pb.BaseController.apiResponse(pb.BaseController.API_SUCCESS, topicDocument.name + ' ' + self.ls.get('CREATED'))});
+                    cb({content: pb.BaseController.apiResponse(pb.BaseController.API_SUCCESS, topicDocument.name + ' ' + self.ls.g('admin.CREATED'))});
                 });
             });
         });

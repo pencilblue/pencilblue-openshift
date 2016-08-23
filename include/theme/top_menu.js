@@ -1,5 +1,5 @@
 /*
-    Copyright (C) 2015  PencilBlue, LLC
+    Copyright (C) 2016  PencilBlue, LLC
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -118,17 +118,17 @@ module.exports = function TopMenuServiceModule(pb) {
                     accountButtons = [
                         {
                             icon: 'user',
-                            title: ls.get('ACCOUNT'),
+                            title: ls.g('admin.ACCOUNT'),
                             href: '/user/manage_account'
                         },
                         {
                             icon: 'rss',
-                            title: ls.get('SUBSCRIBE'),
+                            title: ls.g('generic.SUBSCRIBE'),
                             href: '/feed'
                         },
                         {
                             icon: 'power-off',
-                            title: ls.get('LOGOUT'),
+                            title: ls.g('generic.LOGOUT'),
                             href: '/actions/logout'
                         }
                     ];
@@ -139,12 +139,12 @@ module.exports = function TopMenuServiceModule(pb) {
                     [
                         {
                             icon: 'user',
-                            title: ls.get('ACCOUNT'),
+                            title: ls.g('admin.ACCOUNT'),
                             href: '/user/sign_up'
                         },
                         {
                             icon: 'rss',
-                            title: ls.get('SUBSCRIBE'),
+                            title: ls.g('generic.SUBSCRIBE'),
                             href: '/feed'
                         }
                     ];
@@ -155,7 +155,7 @@ module.exports = function TopMenuServiceModule(pb) {
                 [
                     {
                         icon: 'rss',
-                        title: ls.get('SUBSCRIBE'),
+                        title: ls.g('generic.SUBSCRIBE'),
                         href: '/feed'
                     }
                 ];
@@ -177,7 +177,7 @@ module.exports = function TopMenuServiceModule(pb) {
             cb = options;
             options = {};
         }
-        
+
         var ts = new pb.TemplateService(options);
         ts.load('elements/top_menu/link', function(err, linkTemplate) {
             ts.load('elements/top_menu/dropdown', function(err, dropdownTemplate) {
@@ -240,14 +240,14 @@ module.exports = function TopMenuServiceModule(pb) {
             });
         });
     };
-    
+
     /**
      * @method getNavItems
      * @param {Object} options
      * @param {Localization} options.ls
-     * @param {String} options.activeTheme
      * @param {Object} options.session
      * @param {String} options.currUrl
+     * @param {string} options.site
      * @param {Function} cb
      */
     TopMenuService.prototype.getNavItems = function(options, cb) {
